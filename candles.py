@@ -3,14 +3,14 @@ import numpy as np
 import datetime
 import strategy
 
-
 #FILE = "test_mtgoxUSD_Oct_Dec.csv";
 #FILE = "mtgoxUSD.csv.1";
-FILE = "mtgoxUSD.csv.2";
+FILE = "data/mtgoxUSD.csv.3";
 
 def pretty_print_candle (candle):
-	print ("%d %5.8f %5.8f %5.8f %5.8f" % (candle[0], candle[1],
-									   candle[2], candle[3], candle[4]))
+	print '[{0}] Open:{1:.5f} High:{2:.5f} Low:{3:.5f} Close:{4:.5f}'.format(
+			datetime.datetime.fromtimestamp(int(candle[0])).strftime('%Y-%m-%d %H:%M:%S'),
+			candle[1], candle[2], candle[3], candle[4])
 
 def get_candles_from_history (time_frame):
 	"""
@@ -147,7 +147,8 @@ def ApplyStrategy( candles, initial_USD, strategy ):
 
 if __name__ == "__main__":
 
-	All_candles = get_candles_from_history (60*60)
+	minutes=60
+	All_candles = get_candles_from_history (minutes*60)
 
 #	rsi = strategy.RSI(14)
 #	for candle in All_candles:
@@ -161,7 +162,7 @@ if __name__ == "__main__":
 	BuyAndHold(All_candles, 5000)
 
 
-	print "Ruby Strategy at 60min candles"
+	print "Ruby Strategy at {0}min candles".format(minutes)
 	print "Buy threshold  : 1%"
 	print "Sell threshold : 3%"
 	print "Simulation start :"

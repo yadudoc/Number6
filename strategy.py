@@ -71,6 +71,34 @@ class RSI:
 			return -1
 
 
+def moving_average(x, n, type='simple'):
+    """
+    compute an n period moving average.
+    type is 'simple' | 'exponential'
+    """
+    x = np.asarray(x)
+    if type=='simple':
+        weights = np.ones(n)
+    else:
+        weights = np.exp(np.linspace(-1., 0., n))
+    weights /= weights.sum()
+
+    a =  np.convolve(x, weights, mode='full')[:len(x)]
+    a[:n] = a[n]
+    return a
+
+class Moving_Average:
+	def __init__ (self, periods):
+		self.periods = periods
+		self.last_n  = []
+		self.ema     = 0
+
+	def put (self, candle):
+		if ( len(self.last_n) == periods ):
+			self.last_n.pop(0)
+		self.last_n.append(candle)
+		
+
 
 class Ichimoku:
 
