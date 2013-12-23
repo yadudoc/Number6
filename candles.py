@@ -3,9 +3,9 @@ import numpy as np
 import datetime
 import strategy
 
-#FILE = "test_mtgoxUSD_Oct_Dec.csv";
-#FILE = "mtgoxUSD.csv.1";
-FILE = "data/mtgoxUSD.csv.3";
+#FILE = "data/test_mtgoxUSD_Oct_Dec.csv"
+#FILE = "mtgoxUSD.csv.1"
+FILE = "data/mtgoxUSD.csv.3"
 
 def pretty_print_candle (candle):
 	print '[{0}] Open:{1:.5f} High:{2:.5f} Low:{3:.5f} Close:{4:.5f}'.format(
@@ -94,6 +94,10 @@ def BuyAndHold(candles, initial_USD):
 	print "Inital = ", initial_USD
 	print "Final  = ", final_USD
 
+
+
+
+
 def Ruby (candles, initial_USD):
 	# in percent
 	buy_threshold = 0.01   # .3%
@@ -145,11 +149,29 @@ def ApplyStrategy( candles, initial_USD, strategy ):
 		result =  BuyAndHold(candles, inital_USD)
 	return result
 
+def param_sweep (All_candles):
+
+	MAX = 70
+	result = []
+	for ema1 in range(1,MAX):
+		for ema2 in range(ema1+1, MAX):
+			for ema3 in range(ema2+1, MAX):
+				price = strategy.Ruby_numpy(All_candles, 5000, ema1, ema2, ema3, buy_t=0.01, sell_t=0.03);
+				result.append([ema1,ema2,ema3,price])
+				print [ema1,ema2,ema3,price]
+	array = np.array(result)
+	#print array[np.argsort(array[:,3])]
+
+
 if __name__ == "__main__":
 
 	minutes=60
 	All_candles = get_candles_from_history (minutes*60)
 
+#	param_sweep(All_candles)
+
+
+#	exit(0)
 #	rsi = strategy.RSI(14)
 #	for candle in All_candles:
 #		print candle, " RSI : ", rsi.put(candle)
@@ -158,6 +180,7 @@ if __name__ == "__main__":
 	print "Starting date : ", (datetime.datetime.fromtimestamp(int(All_candles[0][0])).strftime('%Y-%m-%d %H:%M:%S'))
 	print "Ending date   : ", (datetime.datetime.fromtimestamp(int(All_candles[-1][0])).strftime('%Y-%m-%d %H:%M:%S'))
 
+	exit(0)
 	np_history = np.array(All_candles)
 	BuyAndHold(All_candles, 5000)
 

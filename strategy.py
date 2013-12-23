@@ -1,39 +1,7 @@
 #!/usr/bin/env python
 import datetime
 import numpy as np
-
-class Wallet ():
-	def __init__ (self, usd, btc, fee, pair="BTC_USD"):
-		self.pair   = pair
-		self.usd    = float(usd)
-		self.btc    = float(btc)
-		self.fee    = float(fee)  # In percentage applied at buy and sell
-		self.status = "short"
-
-	def buy_all (self, price, timestamp):
-		self.btc = self.usd*(1-(self.fee/100)) / price
-		self.usd = 0.0
-		print '[{0}] BUY:  {1:.5f}BTC AT PRICE:{2:.5f}'.format(
-			   datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'),
-			   self.btc, price)
-		self.status = "long"
-
-	def sell_all (self, price, timestamp):
-		self.usd = self.btc*(1-(self.fee/100)) * price
-		print '[{0}] SELL: {1:.5f}BTC AT PRICE:{2:.5f}'.format(
-			   datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'),
-			   self.btc, price)
-		self.btc = 0
-		self.status = "short"
-
-	def get_balance (self, price, timestamp):
-		if ( self.status == "long" ):
-			print '[{0}] {1:.5f}BTC AT PRICE:{2:.5f} = ${3:.5f}'.format(
-				datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'),
-				self.btc, price , self.btc*(1-(self.fee/100)) * price)
-		else:
-			print '[{0}] HOLDING USD : ${1:.5f}'.format(
-				datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'), self.usd)
+import Wallet
 
 class RSI:
 	def __init__ (self, period ):
@@ -87,21 +55,26 @@ def moving_average(x, n, type='simple'):
     a[:n] = a[n]
     return a
 
-class Moving_Average:
+
+class SMA:
 	def __init__ (self, periods):
 		self.periods = periods
 		self.last_n  = []
-		self.ema     = 0
+		self.ma      = 0
 
-	def put (self, candle):
+	def put (self, candle, close=True):
 		if ( len(self.last_n) == periods ):
 			self.last_n.pop(0)
 		self.last_n.append(candle)
-		
+		result = sum(last_n)/len(last_n)
 
+		# Remove last candle if it did not close
+		if ( close == False ):
+			self.last_n.pop()
+		return result
 
 class Ichimoku:
-
+	''' Incomplete : Ichimoku trading strategy '''
 	def __init__ (self, conf_tenkan=8, conf_kijun=11 ):
 		self.tenkan   = [conf_tenkan, []]
 		self.kijun    = [conf_kijun,  []]
@@ -139,57 +112,98 @@ class Ichimoku:
 		line[1].append(candle)
 
 
+def numpy_moving_average(x, n, type='simple'):
+    """
+    compute an n period moving average.
+    type is 'simple' | 'exponential'
+    """
+    x = np.asarray(x)
+    if type=='simple':
+        weights = np.ones(n)
+    else:
+        weights = np.exp(np.linspace(-1., 0., n))
+    weights /= weights.sum()
 
-"""
-def EMA_Cross (candles, initial_USD):
-    # in percent
-    buy_threshold = 0.01   # .3%
-    sell_threshold = 0.03  # .5%
+    a =  np.convolve(x, weights, mode='full')[:len(x)]
+    a[:n] = a[n]
+    return a
 
-    Current_USD = initial_USD
-    Current_BTC = 0
-    Status = "init"
-    for candle in candles:
-        ema8  = candle[5]
-		ema32 = candle[7]
-        ema41 = candle[8]
-		if   ( ema8-ema41 > candle[4]*buy_threshold ) and Status != "long" :
-			Current_BTC = Current_USD*(1-0.0055)/candle[4]
-			Current_USD = 0.0
-			print '[Going long ] price:{0:.5f}   BTC:{1:.5f}   USD:{2:.5f}  <{3}> '.format(
-				candle[4], Current_BTC, Current_USD, datetime.datetime.fromtimestamp(int(candle[0])).strftime('%Y-%m-%d %H:%M:%S'))
+def Ruby_numpy (candles, initial_USD, ema1=8, ema2=32, ema3=41, buy_t=0.01, sell_t=0.03):
+	"""
+	candles: Expecting a list of lists, each candle being [unix_timestamp, Open,
+	         High, Low, Close ]
+	"""
+	# in percent
+	buy_threshold  = buy_t    #Default .3%
+	sell_threshold = sell_t   #Defaul  .5%
+	wallet = Wallet.sim_wallet(5000, 0, 0.55);
+	np_candles = np.array(candles)
+
+	# Generate the EMAs
+	EMA1  = numpy_moving_average(np_candles[:,4].astype(float), ema1, type='exponential')
+	EMA2  = numpy_moving_average(np_candles[:,4].astype(float), ema2, type='exponential')
+	EMA3  = numpy_moving_average(np_candles[:,4].astype(float), ema3, type='exponential')
+
+	np_candles_ema = np.column_stack ((np_candles, EMA1,  EMA2, EMA3 ))
+
+	Current_USD = initial_USD
+	Current_BTC = 0
+	Status = "init"
+
+	for candle in np_candles_ema:
+		t_ema1  = candle[5]
+		t_ema2  = candle[6]
+		t_ema3  = candle[7]
+		if  t_ema1 > t_ema3 and t_ema3 > t_ema2 and t_ema1-t_ema3 > candle[4]*buy_threshold and Status != "long" :
+
+			#Current_BTC = Current_USD*(1-0.0055)/candle[4]
+			#Current_USD = 0.0
+			#print '[BUY BTC ] price:{0:.5f}   BTC:{1:.5f}   USD:{2:.5f}  <{3}> '.format(
+			#	candle[4], Current_BTC, Current_USD, datetime.datetime.fromtimestamp(int(candle[0])).strftime('%Y-%m-%d %H:%M:%S'))
+			wallet.buy_all(candle[4], candle[0]);
 			Status = "long"
-		elif ema32 > ema41 and ema41 > ema8 and ema32-ema8 > candle[4]*sell_threshold and Status == "long":
-			Current_USD = Current_BTC*(1-0.0055)*candle[4]
-			Current_BTC = 0.0
-			print '[Going short ] price:{0:.5f}   BTC:{1:.5f}   USD:{2:.5f}  <{3}> '.format(
-				candle[4], Current_BTC, Current_USD, datetime.datetime.fromtimestamp(int(candle[0])).strftime('%Y-%m-%d %H:%M:%S'))
+
+		elif t_ema2 > t_ema3 and t_ema3 > t_ema1 and t_ema2-t_ema1 > candle[4]*sell_threshold and Status == "long":
+
+			#Current_USD = Current_BTC*(1-0.0055)*candle[4]
+			#Current_BTC = 0.0
+			#print '[SELL BTC] price:{0:.5f}   BTC:{1:.5f}   USD:{2:.5f}  <{3}> '.format(
+			#	candle[4], Current_BTC, Current_USD, datetime.datetime.fromtimestamp(int(candle[0])).strftime('%Y-%m-%d %H:%M:%S'))
+			wallet.sell_all(candle[4], candle[0]);
 			Status = "short"
-		elif ema8-ema41 > candle[4]*buy_threshold and Status == "init" :
-			Current_BTC = Current_USD*(1-0.0055)/candle[4]
-			Current_USD = 0.0
-			print '[Going long ] price:{0:.5f}   BTC:{1:.5f}   USD:{2:.5f}  <{3}> '.format(
-				candle[4], Current_BTC, Current_USD, datetime.datetime.fromtimestamp(int(candle[0])).strftime('%Y-%m-%d %H:%M:%S'))
+
+		elif t_ema1-t_ema3 > candle[4]*buy_threshold and Status == "init" :
+
+			#Current_BTC = Current_USD*(1-0.0055)/candle[4]
+			#Current_USD = 0.0
+			#print '[BUY BTC ] price:{0:.5f}   BTC:{1:.5f}   USD:{2:.5f}  <{3}> '.format(
+		    #  	candle[4], Current_BTC, Current_USD, datetime.datetime.fromtimestamp(int(candle[0])).strftime('%Y-%m-%d %H:%M:%S'))
+			wallet.buy_all(candle[4], candle[0]);
 			Status = "long"
 
-    print "Cashing out at  : {0:.5f} ".format(candles[-1][4])
-    if ( Status == "long" ) :
-        Current_USD = Current_BTC*(1-0.0055)/candles[-1][4]
-    print "Final EMA_cross usd  : ${0:.5f} ".format(Current_USD)
-    return Current_USD
-"""
+	#if ( Status == "long" ) :
+		#Current_USD = Current_BTC*(1-0.0055)*candles[-1][4]
+
+	return wallet.get_balance(candles[-1][4], candles[-1][0]);
+	#print "Final RUBY usd  : ${0:.5f}  [BTC Price : ${1:.5f}".format(Current_USD, candles[-1][4])
+    #return Current_USD
+
+
 
 
 if __name__ == "__main__":
-	ichi = Ichimoku(8,11)
-	ichi.put([12312312, 12, 13, 8, 10])
-	ichi.put([12312312, 12, 13, 8, 10])
-	ichi.put([12312312, 12, 13, 8, 10])
+
+	print "Hi"
+	#ichi = Ichimoku(8,11)
+	#ichi.put([12312312, 12, 13, 8, 10])
+	#ichi.put([12312312, 12, 13, 8, 10])
+	#ichi.put([12312312, 12, 13, 8, 10])
 
 
-	wallet = Wallet(5000, 0, 0.55)
-	wallet.buy_all(100,1356994005)
-	wallet.sell_all(150, 1356998005)
-	wallet.get_balance(165, 1356999005)
-	wallet.buy_all(150, 1376994005)
-	wallet.get_balance(150, 1376994990)
+	#wallet = Wallet(5000, 0, 0.55)
+	#wallet.buy_all(100,1356994005)
+	#wallet.sell_all(150, 1356998005)
+	#wallet.get_balance(165, 1356999005)
+	#wallet.buy_all(150, 1376994005)
+	#wallet.get_balance(150, 1376994990)
+

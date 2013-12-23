@@ -26,6 +26,7 @@ This is a complete trade data list, in the format unixtimestamp, price, volume
 
 Update from last simulation on Dec 16, 2013.
 
+```python
 yadu@multivacs:~/src/Number6$ ./candles.py 
 Starting date :  2012-12-31 16:00:00
 Ending date   :  2013-12-16 05:00:00
@@ -89,3 +90,5 @@ Simulation start :
 [BUY BTC ] price:900.00000   BTC:844.22387   USD:0.00000  <2013-12-15 19:00:00> 
 Final RUBY usd  : $719530.09475  [BTC Price : $857.01130
 Simulation end
+
+```
